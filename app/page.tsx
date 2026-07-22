@@ -202,7 +202,7 @@ export default function Page() {
           </p>
 
           <a href="mailto:hello@memor.dev" className="inline-block border-b border-black pb-1 text-sm font-medium tracking-[0.02em] hover:opacity-60">
-            hello@memor.dev
+            hey@memor.dev
           </a>
 
           <p className="mt-4 text-[11px] font-light text-[#6B6B6B]">
