@@ -1,4 +1,5 @@
 // app/page.tsx
+import Link from "next/link"
 import { JetBrains_Mono } from "next/font/google"
 
 const mono = JetBrains_Mono({
@@ -54,23 +55,40 @@ const security = [
   "Self-hosted available. Single Docker container inside your network.",
 ]
 
+const CALENDLY_URL = "https://calendly.com/mukur-puri/30min"
+
+function BookCallButton({ className = "" }: { className?: string }) {
+  return (
+    <a
+      href={CALENDLY_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`inline-block shrink-0 rounded bg-black px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-white transition-opacity hover:opacity-80 ${className}`}
+    >
+      Book a 15-min setup call
+    </a>
+  )
+}
+
 export default function Page() {
   return (
     <main className={mono.className + " min-h-screen bg-white text-[#0A0A0A]"}>
-      <div className="mx-auto max-w-[680px] px-6">
-        {/* NAV */}
-        <nav className="pt-7">
-          <div className="flex items-center justify-between">
-            <a href="/" className="text-sm font-bold uppercase tracking-[0.12em]">
+      {/* NAV */}
+      <nav className="sticky top-0 z-50 border-b border-[#E5E5E5] bg-white/95 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-[680px] flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3">
+            <Link href="/" className="text-sm font-bold uppercase tracking-[0.12em]">
               Memor
-            </a>
+            </Link>
             <span className="text-[11px] font-light tracking-[0.06em] text-[#6B6B6B]">
               PR risk analysis · deterministic
             </span>
           </div>
-        </nav>
+          <BookCallButton />
+        </div>
+      </nav>
 
-        <div className="mt-5 h-px w-full bg-black" />
+      <div className="mx-auto max-w-[680px] px-6">
 
         {/* HERO */}
         <section className="py-20">
@@ -81,7 +99,7 @@ export default function Page() {
           <h1 className="mb-6 text-[clamp(1.75rem,4vw,2.5rem)] font-bold leading-[1.15] tracking-[-0.02em]">
             Coding is solved.
             <br />
-            Software isn't.
+            Software isn&apos;t.
           </h1>
 
           <p className="max-w-[480px] text-sm font-light leading-7 text-[#6B6B6B]">
@@ -201,9 +219,12 @@ export default function Page() {
             Piloting with a small number of GitLab and GitHub teams. One repo, fifteen minutes.
           </p>
 
-          <a href="mailto:hello@memor.dev" className="inline-block border-b border-black pb-1 text-sm font-medium tracking-[0.02em] hover:opacity-60">
-            hey@memor.dev
-          </a>
+          <div className="flex flex-wrap items-center gap-5">
+            <a href="mailto:hello@memor.dev" className="inline-block border-b border-black pb-1 text-sm font-medium tracking-[0.02em] hover:opacity-60">
+              hello@memor.dev
+            </a>
+            <BookCallButton />
+          </div>
 
           <p className="mt-4 text-[11px] font-light text-[#6B6B6B]">
             Install is one webhook. Two weeks, nothing useful caught, remove it and tell us why.
