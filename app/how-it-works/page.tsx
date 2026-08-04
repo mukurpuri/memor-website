@@ -67,6 +67,33 @@ const COLOR = {
   blocker: "#DC2626",
 }
 
+const mechanisms = [
+  {
+    title: "Import graph, not regex",
+    text: "Parses real import statements and call sites across the repo. A file matters because something actually calls it, not because its name looks related.",
+  },
+  {
+    title: "Role-aware walk",
+    text: "Callers get classified as route handlers, services, or transitive dependencies based on where they sit in the codebase. The blast radius reads like an engineer's mental model, not a flat file list.",
+  },
+  {
+    title: "Universal pattern packs",
+    text: "Run on every file regardless of language. Hardcoded secrets, timing-unsafe comparisons, breaking API contracts, dependency downgrades.",
+  },
+  {
+    title: "Framework-specific packs",
+    text: "Deeper checks tuned to each framework's real conventions. Twelve frameworks covered: Spring, NestJS, Express, Django, Dropwizard, React, Next.js, Rails, Gin, GORM, ASP.NET Core, EF Core.",
+  },
+  {
+    title: "Git signal cross-check",
+    text: "Co-change coupling and hotfix history catch what the import graph alone can't. Files that always change together, code that keeps getting patched under pressure.",
+  },
+  {
+    title: "Deterministic composition",
+    text: "No LLM scores anything. Findings are combined through fixed rules into one verdict. Same diff in, same verdict out, every time.",
+  },
+]
+
 const steps = [
   {
     n: 1,
@@ -295,6 +322,27 @@ export default function HowItWorksPage() {
                 </div>
                 <h2 className="mb-3 text-lg font-medium leading-snug tracking-[-0.01em]">{s.title}</h2>
                 <p className="max-w-[420px] text-[13px] font-light leading-7 text-[#6B6B6B]">{s.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="border-t border-[#E5E5E5]" />
+
+        {/* MECHANISMS */}
+        <section className="py-16">
+          <p className="mb-6 text-[11px] uppercase tracking-[0.14em] text-[#6B6B6B]">The mechanisms</p>
+          <div className="border-t border-[#E5E5E5]">
+            {mechanisms.map((m, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-1 gap-3 border-b border-[#E5E5E5] py-6 sm:grid-cols-[200px_1fr] sm:gap-6"
+              >
+                <div className="pt-1 text-[11px] font-medium uppercase tracking-[0.08em]">{m.title}</div>
+                <p className="max-w-[480px] text-[13px] font-light leading-7 text-[#6B6B6B]">
+                  <span className="font-medium text-black">{m.text.split(". ")[0]}.</span>{" "}
+                  {m.text.split(". ").slice(1).join(". ")}
+                </p>
               </div>
             ))}
           </div>
