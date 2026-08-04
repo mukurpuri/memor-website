@@ -70,7 +70,7 @@ const COLOR = {
 const steps = [
   {
     n: 1,
-    emoji: "🕸️",
+    emoji: "🧩",
     title: "Builds a dependency graph from the PR diff",
     body: "Every changed file becomes a node. Memor parses real imports and call sites across the repo to place it in the graph, not a guess from the file name.",
   },
@@ -277,7 +277,7 @@ export default function HowItWorksPage() {
             </div>
           </div>
 
-          <div className="order-2 flex flex-col gap-[40vh] md:order-1 md:gap-[55vh]">
+          <div className="order-2 flex flex-col gap-[16vh] md:order-1 md:gap-[28vh]">
             {steps.map((s, i) => (
               <div
                 key={s.n}
