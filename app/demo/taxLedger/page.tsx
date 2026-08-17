@@ -67,7 +67,8 @@ function DiffView({ diff }: { diff: string }) {
       {sections.map((section, si) => (
         <div key={si}>
           {sections.length > 1 && (
-            <div className="border-b border-[#30363d] bg-[#161b22] px-4 py-2 text-[11px] font-medium text-[#8b949e]">
+            <div className="flex items-center gap-2 border-b border-[#3d3320] border-l-2 border-l-[#d4a72c] bg-[#1a1710] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#d4a72c]">
+              <span>📄</span>
               {section.file}
             </div>
           )}
