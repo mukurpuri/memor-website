@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { JetBrains_Mono } from "next/font/google"
+import { prDiffs } from "./diffs"
 
 const mono = JetBrains_Mono({
   subsets: ["latin"],
@@ -11,6 +12,53 @@ const mono = JetBrains_Mono({
 
 const CALENDLY_URL = "https://calendly.com/mukur-puri/30min"
 const REPO_URL = "https://github.com/mukurpuri/TaxLedger"
+
+// ── Diff rendering ─────────────────────────────────────────────────────────
+// Real diff text from GitHub, unified format. Strips the git/index/+++/--- header
+// lines (the file name is already shown in the card header above) and colors each
+// line by its leading +/-/@@ marker.
+
+function DiffView({ diff }: { diff: string }) {
+  const lines = diff
+    .split("\n")
+    .filter((l) => !l.startsWith("diff --git") && !l.startsWith("index ") && !l.startsWith("+++") && !l.startsWith("---"))
+    .filter((l, i, arr) => !(l === "" && i === arr.length - 1))
+
+  return (
+    <div className="overflow-x-auto bg-[#0A0A0A] px-4 py-3">
+      <pre className="text-[11.5px] leading-[1.7]">
+        {lines.map((line, i) => {
+          if (line.startsWith("@@")) {
+            return (
+              <div key={i} className="text-[#6B9DC2]">
+                {line}
+              </div>
+            )
+          }
+          if (line.startsWith("+")) {
+            return (
+              <div key={i} className="bg-[#0F2818] text-[#5FD98A]">
+                {line}
+              </div>
+            )
+          }
+          if (line.startsWith("-")) {
+            return (
+              <div key={i} className="bg-[#2A1414] text-[#F27878]">
+                {line}
+              </div>
+            )
+          }
+          return (
+            <div key={i} className="text-[#8A8A8A]">
+              {line}
+            </div>
+          )
+        })}
+      </pre>
+    </div>
+  )
+}
 
 function BookCallButton({ className = "" }: { className?: string }) {
   return (
@@ -280,19 +328,15 @@ export default function TaxLedgerDemoPage() {
       <div className="mx-auto max-w-[1040px] px-6">
         {/* HERO */}
         <section className="py-14">
-          <p className="mb-5 text-[11px] uppercase tracking-[0.14em] text-[#6B6B6B]">
+          <h1 className="mb-4 text-[11px] uppercase tracking-[0.14em] text-[#6B6B6B]">
             What kind of issues does Memor catch?
-          </p>
-          <h1 className="mb-6 text-[clamp(1.6rem,3.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.02em]">
-            {totalPRs} real PRs. {categories.length} categories.
-            <br />
-            Zero mentioned a bug.
           </h1>
           <p className="max-w-[880px] text-sm font-light leading-7 text-[#6B6B6B]">
             TaxLedger is a real, working Indian tax-filing app — Express, TypeScript, Prisma, Zod, React.
-            Every PR below is written to look like ordinary engineering work: a refactor, a cleanup, a
-            dependency bump. Memor caught every one anyway, automatically, before merge. What you see
-            on the right is the actual comment it posted, unedited.
+            {totalPRs} PRs below, across {categories.length} categories, each written to look like
+            ordinary engineering work: a refactor, a cleanup, a dependency bump. Memor caught every one
+            anyway, automatically, before merge. What you see per PR is the actual diff and the actual
+            comment Memor posted, unedited.
           </p>
         </section>
 
@@ -359,7 +403,11 @@ export default function TaxLedgerDemoPage() {
                       {pr.file}
                     </span>
                   </div>
-                  <div className="bg-white p-4">
+                  {prDiffs[pr.number] && <DiffView diff={prDiffs[pr.number]} />}
+                  <div className="border-t border-[#E5E5E5] bg-white p-4">
+                    <p className="mb-1.5 text-[10px] uppercase tracking-[0.1em] text-[#B5B5B5]">
+                      Memor's comment
+                    </p>
                     <p className="text-[12.5px] leading-6 text-[#0A0A0A]">{pr.comment}</p>
                   </div>
                   <div className="border-t border-[#F5F5F5] bg-white px-4 py-2">
