@@ -283,12 +283,12 @@ export default function TaxLedgerDemoPage() {
           <p className="mb-5 text-[11px] uppercase tracking-[0.14em] text-[#6B6B6B]">
             What kind of issues does Memor catch?
           </p>
-          <h1 className="mb-6 max-w-[640px] text-[clamp(1.6rem,3.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.02em]">
+          <h1 className="mb-6 text-[clamp(1.6rem,3.6vw,2.25rem)] font-bold leading-[1.15] tracking-[-0.02em]">
             {totalPRs} real PRs. {categories.length} categories.
             <br />
             Zero mentioned a bug.
           </h1>
-          <p className="max-w-[560px] text-sm font-light leading-7 text-[#6B6B6B]">
+          <p className="max-w-[880px] text-sm font-light leading-7 text-[#6B6B6B]">
             TaxLedger is a real, working Indian tax-filing app — Express, TypeScript, Prisma, Zod, React.
             Every PR below is written to look like ordinary engineering work: a refactor, a cleanup, a
             dependency bump. Memor caught every one anyway, automatically, before merge. What you see
@@ -333,8 +333,8 @@ export default function TaxLedgerDemoPage() {
             <div className="mb-6 flex items-start gap-3 border-b border-[#E5E5E5] pb-6">
               <span className="text-2xl leading-none">{active.icon}</span>
               <div>
-                <h2 className="text-[15px] font-bold tracking-[-0.01em]">{active.name}</h2>
-                <p className="mt-1 text-[12.5px] font-light leading-6 text-[#6B6B6B]">
+                <h2 className="text-[18px] font-bold tracking-[-0.01em]">{active.name}</h2>
+                <p className="mt-1.5 text-[15px] font-light leading-7 text-[#6B6B6B]">
                   {active.description}
                 </p>
               </div>
