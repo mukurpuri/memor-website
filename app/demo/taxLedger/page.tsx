@@ -304,6 +304,76 @@ const categories: Category[] = [
 
 const totalPRs = categories.reduce((n, c) => n + c.prs.length, 0)
 
+// ── PR card, tabbed: what the PR is + what Memor said, vs. the raw diff ─────
+
+function PRCard({ pr }: { pr: PR }) {
+  const [tab, setTab] = useState<"pr" | "diff">("pr")
+  const diff = prDiffs[pr.number]
+
+  const tabButtonClass = (t: "pr" | "diff") =>
+    `border-b-2 px-4 py-2.5 text-[11.5px] font-medium uppercase tracking-[0.06em] transition-colors ${
+      tab === t
+        ? "border-black text-black"
+        : "border-transparent text-[#8A8A8A] hover:text-black"
+    }`
+
+  return (
+    <div className="overflow-hidden rounded border border-[#E5E5E5]">
+      <div className="flex items-center gap-3 border-b border-[#E5E5E5] bg-[#F5F5F5] px-4 py-3">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
+          M
+        </div>
+        <a
+          href={`${REPO_URL}/pull/${pr.number}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[12.5px] font-medium hover:underline"
+        >
+          #{pr.number} — {pr.title}
+        </a>
+        <span className="ml-auto shrink-0 rounded border border-[#E5E5E5] bg-white px-2 py-0.5 text-[10px] tracking-[0.02em] text-[#6B6B6B]">
+          {pr.file}
+        </span>
+      </div>
+
+      <div className="flex border-b border-[#E5E5E5] bg-white">
+        <button onClick={() => setTab("pr")} className={tabButtonClass("pr")}>
+          What is the PR
+        </button>
+        <button onClick={() => setTab("diff")} className={tabButtonClass("diff")}>
+          The diff
+        </button>
+      </div>
+
+      {tab === "pr" ? (
+        <div className="bg-white p-4">
+          <p className="mb-1.5 text-[10px] uppercase tracking-[0.1em] text-[#B5B5B5]">
+            Memor's comment
+          </p>
+          <p className="text-[12.5px] leading-6 text-[#0A0A0A]">{pr.comment}</p>
+        </div>
+      ) : diff ? (
+        <DiffView diff={diff} />
+      ) : (
+        <div className="bg-white p-4">
+          <p className="text-[12px] text-[#8A8A8A]">Diff unavailable.</p>
+        </div>
+      )}
+
+      <div className="border-t border-[#F5F5F5] bg-white px-4 py-2">
+        <a
+          href={`${REPO_URL}/pull/${pr.number}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10.5px] tracking-[0.02em] text-[#6B6B6B] hover:text-black hover:underline"
+        >
+          View on GitHub →
+        </a>
+      </div>
+    </div>
+  )
+}
+
 export default function TaxLedgerDemoPage() {
   const [activeId, setActiveId] = useState(categories[0].id)
   const active = categories.find((c) => c.id === activeId)!
@@ -386,41 +456,7 @@ export default function TaxLedgerDemoPage() {
 
             <div className="space-y-4">
               {active.prs.map((pr) => (
-                <div key={pr.number} className="overflow-hidden rounded border border-[#E5E5E5]">
-                  <div className="flex items-center gap-3 border-b border-[#E5E5E5] bg-[#F5F5F5] px-4 py-3">
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
-                      M
-                    </div>
-                    <a
-                      href={`${REPO_URL}/pull/${pr.number}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[12.5px] font-medium hover:underline"
-                    >
-                      #{pr.number} — {pr.title}
-                    </a>
-                    <span className="ml-auto shrink-0 rounded border border-[#E5E5E5] bg-white px-2 py-0.5 text-[10px] tracking-[0.02em] text-[#6B6B6B]">
-                      {pr.file}
-                    </span>
-                  </div>
-                  {prDiffs[pr.number] && <DiffView diff={prDiffs[pr.number]} />}
-                  <div className="border-t border-[#E5E5E5] bg-white p-4">
-                    <p className="mb-1.5 text-[10px] uppercase tracking-[0.1em] text-[#B5B5B5]">
-                      Memor's comment
-                    </p>
-                    <p className="text-[12.5px] leading-6 text-[#0A0A0A]">{pr.comment}</p>
-                  </div>
-                  <div className="border-t border-[#F5F5F5] bg-white px-4 py-2">
-                    <a
-                      href={`${REPO_URL}/pull/${pr.number}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10.5px] tracking-[0.02em] text-[#6B6B6B] hover:text-black hover:underline"
-                    >
-                      View on GitHub →
-                    </a>
-                  </div>
-                </div>
+                <PRCard key={pr.number} pr={pr} />
               ))}
             </div>
           </div>
