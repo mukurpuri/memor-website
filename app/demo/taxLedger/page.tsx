@@ -333,7 +333,7 @@ const categories: Category[] = [
         file: "taxCalculator.ts",
         purpose: "Add a currency parameter to the tax calculator ahead of multi-currency support.",
         headline: "High risk → merging this will break external consumers on deploy",
-        findings: [{ severity: "blocker", file: "taxCalculator.ts", reason: "API contract changed; external consumers exist" }],
+        findings: [{ severity: "blocker", file: "taxCalculator.ts", reason: "Function signature changed. Callers not caught by the import graph may break." }],
       },
       {
         number: 15,
@@ -342,7 +342,7 @@ const categories: Category[] = [
         purpose: "Reorder the GST calculator's parameters to match the tax calculator's convention.",
         headline: "High risk → merging this will break external consumers on deploy",
         findings: [
-          { severity: "blocker", file: "gstCalculator.ts", reason: "API contract changed; external consumers exist" },
+          { severity: "blocker", file: "gstCalculator.ts", reason: "Function signature changed. Callers not caught by the import graph may break." },
           { severity: "blocker", file: "taxRoutes.ts", reason: "Blast radius: changed, called by app.ts, index.ts" },
         ],
       },
@@ -409,7 +409,7 @@ const categories: Category[] = [
         purpose: "Remove handling that looked redundant with what the multer middleware already covers upstream.",
         headline: "High risk → merging this alters a table schema; downstream services may fail",
         findings: [
-          { severity: "blocker", file: "uploadHandler.ts", reason: "schema changed; downstream services may fail after migration" },
+          { severity: "blocker", file: "uploadHandler.ts", reason: "Database schema change. Services querying affected tables may need updates." },
           {
             severity: "blocker",
             file: "uploadHandler.ts",
@@ -425,7 +425,7 @@ const categories: Category[] = [
         purpose: "Remove handling around a notification send that \"shouldn't be able to fail.\"",
         headline: "High risk → merging this alters a table schema; downstream services may fail",
         findings: [
-          { severity: "blocker", file: "notifier.ts", reason: "schema changed; downstream services may fail after migration" },
+          { severity: "blocker", file: "notifier.ts", reason: "Database schema change. Services querying affected tables may need updates." },
           {
             severity: "blocker",
             file: "filingService.ts",
@@ -561,7 +561,7 @@ const categories: Category[] = [
         file: "schemas.ts",
         purpose: "Relax validation that looked overly strict and was rejecting valid input.",
         headline: "High risk → merging this will break external consumers on deploy",
-        findings: [{ severity: "blocker", file: "schemas.ts", reason: "API contract changed; external consumers exist" }],
+        findings: [{ severity: "blocker", file: "schemas.ts", reason: ".email() removed from a Zod schema field. Data that used to fail this validation can now pass through and reach the handler." }],
       },
     ],
   },
@@ -578,7 +578,7 @@ const categories: Category[] = [
         purpose: "Simplify a cleanup script that resets draft filings for a test user.",
         headline: "High risk → merging this alters a table schema; downstream services may fail",
         findings: [
-          { severity: "blocker", file: "seed.ts", reason: "schema changed; downstream services may fail after migration" },
+          { severity: "blocker", file: "seed.ts", reason: "Database schema change. Services querying affected tables may need updates." },
           {
             severity: "blocker",
             file: "seed.ts",
@@ -717,9 +717,7 @@ export default function TaxLedgerDemoPage() {
             We built TaxLedger specifically for engineering teams at Clear, to show the categories and
             types of impact detection Memor can actually analyze. TaxLedger is a real, working Indian
             tax-filing app — Express, TypeScript, Prisma, Zod, React. {totalPRs} PRs below, across{" "}
-            {categories.length} categories, each written to look like ordinary engineering work: a
-            refactor, a cleanup, a dependency bump. Memor caught every one anyway, automatically, before
-            merge. What you see per PR is the actual diff and the actual comment Memor posted, unedited.
+            {categories.length} categories.
           </p>
         </section>
 
@@ -727,6 +725,9 @@ export default function TaxLedgerDemoPage() {
         <section className="grid grid-cols-1 gap-8 pb-24 md:grid-cols-[240px_1fr]">
           {/* SIDEBAR */}
           <nav className="md:sticky md:top-24 md:self-start">
+            <p className="mb-3 px-3 text-[10px] uppercase tracking-[0.1em] text-[#8A8A8A] md:px-0">
+              Analysis categories
+            </p>
             <div className="scrollbar-none -mx-6 flex gap-1 overflow-x-auto px-6 pb-2 md:mx-0 md:flex-col md:gap-0.5 md:overflow-visible md:px-0 md:pb-0">
               {categories.map((c) => {
                 const isActive = c.id === activeId
