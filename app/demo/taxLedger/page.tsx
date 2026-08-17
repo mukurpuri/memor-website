@@ -714,11 +714,12 @@ export default function TaxLedgerDemoPage() {
             What kind of issues does Memor catch?
           </h1>
           <p className="max-w-[880px] text-sm font-light leading-7 text-[#6B6B6B]">
-            TaxLedger is a real, working Indian tax-filing app — Express, TypeScript, Prisma, Zod, React.
-            {totalPRs} PRs below, across {categories.length} categories, each written to look like
-            ordinary engineering work: a refactor, a cleanup, a dependency bump. Memor caught every one
-            anyway, automatically, before merge. What you see per PR is the actual diff and the actual
-            comment Memor posted, unedited.
+            We built TaxLedger specifically for engineering teams at Clear, to show the categories and
+            types of impact detection Memor can actually analyze. TaxLedger is a real, working Indian
+            tax-filing app — Express, TypeScript, Prisma, Zod, React. {totalPRs} PRs below, across{" "}
+            {categories.length} categories, each written to look like ordinary engineering work: a
+            refactor, a cleanup, a dependency bump. Memor caught every one anyway, automatically, before
+            merge. What you see per PR is the actual diff and the actual comment Memor posted, unedited.
           </p>
         </section>
 
