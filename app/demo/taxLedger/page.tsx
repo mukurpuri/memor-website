@@ -60,6 +60,86 @@ function DiffView({ diff }: { diff: string }) {
   )
 }
 
+// ── GitHub-comment-styled render of Memor's actual PR comment ───────────────
+// Warnings render collapsed behind a disclosure (matching how the real comment
+// hides low-severity findings by default); blockers render open, since that's
+// the one thing worth seeing without an extra click.
+
+function GitHubComment({ pr }: { pr: PR }) {
+  const [open, setOpen] = useState(pr.severity === "blocker")
+  const dotColor = pr.severity === "blocker" ? "bg-[#f85149]" : "bg-[#d29922]"
+  const headlineParts = pr.headline.split(/(`[^`]+`)/g)
+
+  return (
+    <div className="overflow-hidden rounded-md border border-[#30363d] bg-[#0d1117]">
+      {/* comment header */}
+      <div className="flex items-center gap-2.5 border-b border-[#30363d] bg-[#161b22] px-4 py-3">
+        <img src="/memor-logo.svg" alt="" className="h-6 w-6 shrink-0 rounded bg-white p-0.5" />
+        <span className="text-[13px] font-semibold text-[#e6edf3]">memor-impact-analyzer</span>
+        <span className="rounded-full border border-[#30363d] bg-[#21262d] px-1.5 py-[1px] text-[10px] font-medium text-[#8b949e]">
+          Bot
+        </span>
+        <span className="text-[12px] text-[#8b949e]">commented on this PR</span>
+        <span className="ml-auto text-[14px] text-[#8b949e]">•••</span>
+      </div>
+
+      {/* comment body */}
+      <div className="px-4 py-4">
+        <div className="mb-3 flex items-start gap-2">
+          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
+          <p className="text-[13px] font-semibold leading-5 text-[#e6edf3]">
+            {headlineParts.map((part, i) =>
+              part.startsWith("`") ? (
+                <code key={i} className="rounded bg-[#21262d] px-1 py-0.5 text-[12px] font-normal text-[#e6edf3]">
+                  {part.slice(1, -1)}
+                </code>
+              ) : (
+                <span key={i}>{part}</span>
+              ),
+            )}
+          </p>
+        </div>
+
+        <button
+          onClick={() => setOpen(!open)}
+          className="mb-1 flex items-center gap-1.5 text-[12px] text-[#e6edf3]"
+        >
+          <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
+          <span className={pr.severity === "blocker" ? "text-[#f85149]" : "text-[#d29922]"}>
+            {pr.severity === "blocker" ? "🔴" : "⚠️"}
+          </span>
+          <span>1 {pr.severity === "blocker" ? "blocker" : "warning"}</span>
+        </button>
+
+        {open && (
+          <div className="mt-2 overflow-hidden rounded border border-[#30363d]">
+            <table className="w-full border-collapse text-left text-[12px]">
+              <thead>
+                <tr className="border-b border-[#30363d] bg-[#161b22] text-[#8b949e]">
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">File name</th>
+                  <th className="px-3 py-2 font-medium">Why</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="whitespace-nowrap px-3 py-2.5 align-top text-[#e6edf3]">
+                    {pr.severity === "blocker" ? "🔴 blocker" : "🟡 warning"}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2.5 align-top text-[#58a6ff]">{pr.file}</td>
+                  <td className="px-3 py-2.5 align-top leading-5 text-[#c9d1d9]">{pr.comment}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <p className="mt-3 text-[11.5px] italic text-[#8b949e]">1 finding · 1 file analyzed</p>
+      </div>
+    </div>
+  )
+}
+
 function BookCallButton({ className = "" }: { className?: string }) {
   return (
     <a
@@ -75,7 +155,14 @@ function BookCallButton({ className = "" }: { className?: string }) {
 
 // ── Data ───────────────────────────────────────────────────────────────────
 
-type PR = { number: number; title: string; file: string; comment: string }
+type PR = {
+  number: number
+  title: string
+  file: string
+  comment: string
+  severity: "blocker" | "warning"
+  headline: string
+}
 type Category = { id: string; icon: string; name: string; description: string; prs: PR[] }
 
 const categories: Category[] = [
@@ -89,6 +176,8 @@ const categories: Category[] = [
         number: 1,
         title: "Simplify tax calculation return shape",
         file: "taxCalculator.ts",
+        severity: "warning",
+        headline: "Warning → review flagged items before merging",
         comment:
           "Blast radius: 5 files (5 transitive), called by taxRoutes.ts, filingService.ts, app.ts, filingRoutes.ts, index.ts",
       },
@@ -96,6 +185,8 @@ const categories: Category[] = [
         number: 2,
         title: "Extract shared rounding helper",
         file: "utils.ts",
+        severity: "warning",
+        headline: "Warning → review flagged items before merging",
         comment:
           "Blast radius: 13 files (13 transitive), called by app.ts, taxRoutes.ts, invoiceGenerator.ts, paymentProcessor.ts +9 more",
       },
@@ -111,6 +202,8 @@ const categories: Category[] = [
         number: 22,
         title: "Share bracket lookup between tax and discount logic",
         file: "discountEngine.ts",
+        severity: "warning",
+        headline: "Warning → review flagged items before merging",
         comment:
           "Blast radius: 6 files (6 transitive), called by taxCalculator.ts, taxRoutes.ts, filingService.ts +3 more",
       },
@@ -118,6 +211,8 @@ const categories: Category[] = [
         number: 21,
         title: "Reuse calculation context across tax modules",
         file: "calculationContext.ts",
+        severity: "warning",
+        headline: "Warning → review flagged items before merging",
         comment:
           "Blast radius: 7 files (7 transitive), called by discountEngine.ts, taxCalculator.ts, taxRoutes.ts +4 more",
       },
@@ -133,6 +228,8 @@ const categories: Category[] = [
         number: 20,
         title: "Streamline admin route middleware chain",
         file: "adminRoutes.ts",
+        severity: "blocker",
+        headline: "High risk → merging this changes access control in `adminRoutes.ts`; verify users still have correct permissions",
         comment:
           "requireRole removed from route handler; endpoint is now accessible without this authorization check",
       },
@@ -140,6 +237,8 @@ const categories: Category[] = [
         number: 19,
         title: "Remove redundant auth check on filing submit",
         file: "paymentRoutes.ts",
+        severity: "blocker",
+        headline: "High risk → merging this changes access control in `paymentRoutes.ts`; verify users still have correct permissions",
         comment:
           "An authorization check (requireAuth) was removed. If this handler still accepts a resource identifier from the caller, requests may now bypass a permission check that used to gate them.",
       },
@@ -155,12 +254,16 @@ const categories: Category[] = [
         number: 16,
         title: "Add currency support to tax calculation",
         file: "taxCalculator.ts",
+        severity: "blocker",
+        headline: "High risk → merging this will break external consumers on deploy",
         comment: "API contract changed; external consumers exist",
       },
       {
         number: 15,
         title: "Reorder GST calculation parameters for consistency",
         file: "gstCalculator.ts",
+        severity: "blocker",
+        headline: "High risk → merging this will break external consumers on deploy",
         comment: "API contract changed; external consumers exist",
       },
     ],
@@ -175,6 +278,8 @@ const categories: Category[] = [
         number: 14,
         title: "Simplify payment gateway call",
         file: "paymentGateway.ts",
+        severity: "blocker",
+        headline: "High risk → merging this will break `paymentProcessor.ts` and `paymentRoutes.ts` and 2 others on deploy",
         comment:
           "A try/catch block around an await was removed. The awaited call's failure used to be caught here — if it throws now, the error propagates uncaught instead of being handled the way this code previously handled it.",
       },
@@ -182,6 +287,8 @@ const categories: Category[] = [
         number: 13,
         title: "Clean up payment processor error wrapping",
         file: "paymentProcessor.ts",
+        severity: "blocker",
+        headline: "High risk → merging this will break `paymentRoutes.ts` and `app.ts` and 1 other on deploy",
         comment:
           "Same finding, on paymentProcessor.ts — the try/catch around the gateway call was removed here too.",
       },
@@ -197,6 +304,8 @@ const categories: Category[] = [
         number: 12,
         title: "Simplify document upload handling",
         file: "uploadHandler.ts",
+        severity: "blocker",
+        headline: "High risk → merging this alters a table schema; downstream services may fail",
         comment:
           "A try/catch block around an await was removed — an upload failure now propagates uncaught instead of being handled",
       },
@@ -204,6 +313,8 @@ const categories: Category[] = [
         number: 11,
         title: "Simplify notification dispatch",
         file: "notifier.ts",
+        severity: "blocker",
+        headline: "High risk → merging this alters a table schema; downstream services may fail",
         comment:
           "A try/catch block around an await was removed — a failed notification now propagates uncaught instead of being handled",
       },
@@ -219,6 +330,8 @@ const categories: Category[] = [
         number: 10,
         title: "Simplify refund status polling",
         file: "useFilingStatus.ts",
+        severity: "warning",
+        headline: "Warning → review flagged items before merging",
         comment:
           "A bare return () => {...} was removed. If this was a useEffect cleanup, whatever it was tearing down — an event listener, a subscription, a timer — now leaks: it keeps running after the component unmounts, and can fire against stale state.",
       },
@@ -226,6 +339,8 @@ const categories: Category[] = [
         number: 9,
         title: "Refactor filing status hook",
         file: "useFilingStatus.ts",
+        severity: "warning",
+        headline: "Warning → review flagged items before merging",
         comment:
           "A hook's dependency array shrank (1 → 0 entries). If the removed dependency is still referenced inside the hook, it now closes over a stale value instead of reacting to changes — a common source of bugs that only show up intermittently.",
       },
@@ -241,12 +356,16 @@ const categories: Category[] = [
         number: 8,
         title: "Add local dev fallback for payment gateway key",
         file: "env.ts",
+        severity: "blocker",
+        headline: "High risk → merging this rotates credentials in `env.ts`; verify CI/CD still has access",
         comment: "Stripe key committed to source as a literal string; rotate this credential and read it from env instead",
       },
       {
         number: 7,
         title: "Add debug logging for gateway integration issue",
         file: "paymentGateway.ts",
+        severity: "blocker",
+        headline: "High risk → merging this rotates credentials in `paymentGateway.ts`; verify CI/CD still has access",
         comment: "apikey credential committed to source for the first time; verify this is not a production secret",
       },
     ],
@@ -261,12 +380,16 @@ const categories: Category[] = [
         number: 6,
         title: "Loosen dependency version pins",
         file: "package.json",
+        severity: "warning",
+        headline: "Warning → review flagged items before merging",
         comment: "Flagged in package.json — may fail at runtime without surfacing an error",
       },
       {
         number: 23,
         title: "Remove unused multer dependency",
         file: "package.json",
+        severity: "warning",
+        headline: "Warning → review flagged items before merging",
         comment: "Flagged in package.json — may fail at runtime without surfacing an error",
       },
     ],
@@ -281,6 +404,8 @@ const categories: Category[] = [
         number: 4,
         title: "Simplify filing request schema",
         file: "schemas.ts",
+        severity: "blocker",
+        headline: "High risk → merging this will break external consumers on deploy",
         comment: "API contract changed; external consumers exist",
       },
     ],
@@ -295,6 +420,8 @@ const categories: Category[] = [
         number: 24,
         title: "Simplify draft filing cleanup",
         file: "seed.ts",
+        severity: "blocker",
+        headline: "High risk → merging this alters a table schema; downstream services may fail",
         comment:
           "deleteMany() called with no filter — this deletes every row in the table, not a scoped subset. If a where clause was meant to be here, its absence won't throw; it'll just wipe the table.",
       },
@@ -346,11 +473,8 @@ function PRCard({ pr }: { pr: PR }) {
       </div>
 
       {tab === "pr" ? (
-        <div className="bg-white p-4">
-          <p className="mb-1.5 text-[10px] uppercase tracking-[0.1em] text-[#B5B5B5]">
-            Memor's comment
-          </p>
-          <p className="text-[12.5px] leading-6 text-[#0A0A0A]">{pr.comment}</p>
+        <div className="bg-[#F5F5F5] p-4">
+          <GitHubComment pr={pr} />
         </div>
       ) : diff ? (
         <DiffView diff={diff} />
