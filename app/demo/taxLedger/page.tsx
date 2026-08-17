@@ -13,6 +13,13 @@ const mono = JetBrains_Mono({
 const CALENDLY_URL = "https://calendly.com/mukur-puri/30min"
 const REPO_URL = "https://github.com/mukurpuri/TaxLedger"
 
+// Every file touched in a diff, parsed straight from its own "diff --git a/X b/Y"
+// header lines — no separate fetch needed, the diff text already has this.
+function filesInDiff(diff: string): string[] {
+  const matches = diff.matchAll(/^diff --git a\/(.+?) b\/.+$/gm)
+  return [...matches].map((m) => m[1])
+}
+
 // ── Diff rendering ─────────────────────────────────────────────────────────
 // Real diff text from GitHub, unified format. Strips the git/index/+++/--- header
 // lines (the file name is already shown in the card header above) and colors each
@@ -162,6 +169,7 @@ type PR = {
   comment: string
   severity: "blocker" | "warning"
   headline: string
+  purpose: string
 }
 type Category = { id: string; icon: string; name: string; description: string; prs: PR[] }
 
@@ -176,6 +184,7 @@ const categories: Category[] = [
         number: 1,
         title: "Simplify tax calculation return shape",
         file: "taxCalculator.ts",
+        purpose: "Collapse the return value down to just the final number now that most callers only need the total, not the full breakdown.",
         severity: "warning",
         headline: "Warning → review flagged items before merging",
         comment:
@@ -185,6 +194,7 @@ const categories: Category[] = [
         number: 2,
         title: "Extract shared rounding helper",
         file: "utils.ts",
+        purpose: "DRY pass: tax and GST calculations were each rounding currency their own way — pull it into one shared helper.",
         severity: "warning",
         headline: "Warning → review flagged items before merging",
         comment:
@@ -202,6 +212,7 @@ const categories: Category[] = [
         number: 22,
         title: "Share bracket lookup between tax and discount logic",
         file: "discountEngine.ts",
+        purpose: "Reuse the existing bracket-lookup logic in the discount engine instead of duplicating it.",
         severity: "warning",
         headline: "Warning → review flagged items before merging",
         comment:
@@ -211,6 +222,7 @@ const categories: Category[] = [
         number: 21,
         title: "Reuse calculation context across tax modules",
         file: "calculationContext.ts",
+        purpose: "Share the calculation context helper across tax modules instead of each one rebuilding it.",
         severity: "warning",
         headline: "Warning → review flagged items before merging",
         comment:
@@ -228,6 +240,7 @@ const categories: Category[] = [
         number: 20,
         title: "Streamline admin route middleware chain",
         file: "adminRoutes.ts",
+        purpose: "Simplify and deduplicate the middleware chain on the admin routes.",
         severity: "blocker",
         headline: "High risk → merging this changes access control in `adminRoutes.ts`; verify users still have correct permissions",
         comment:
@@ -237,6 +250,7 @@ const categories: Category[] = [
         number: 19,
         title: "Remove redundant auth check on filing submit",
         file: "paymentRoutes.ts",
+        purpose: "Remove what looked like a duplicate auth check on this route.",
         severity: "blocker",
         headline: "High risk → merging this changes access control in `paymentRoutes.ts`; verify users still have correct permissions",
         comment:
@@ -254,6 +268,7 @@ const categories: Category[] = [
         number: 16,
         title: "Add currency support to tax calculation",
         file: "taxCalculator.ts",
+        purpose: "Add a currency parameter to the tax calculator ahead of multi-currency support.",
         severity: "blocker",
         headline: "High risk → merging this will break external consumers on deploy",
         comment: "API contract changed; external consumers exist",
@@ -262,6 +277,7 @@ const categories: Category[] = [
         number: 15,
         title: "Reorder GST calculation parameters for consistency",
         file: "gstCalculator.ts",
+        purpose: "Reorder the GST calculator's parameters to match the tax calculator's convention.",
         severity: "blocker",
         headline: "High risk → merging this will break external consumers on deploy",
         comment: "API contract changed; external consumers exist",
@@ -278,6 +294,7 @@ const categories: Category[] = [
         number: 14,
         title: "Simplify payment gateway call",
         file: "paymentGateway.ts",
+        purpose: "Simplify the gateway call since the SDK already handles retries.",
         severity: "blocker",
         headline: "High risk → merging this will break `paymentProcessor.ts` and `paymentRoutes.ts` and 2 others on deploy",
         comment:
@@ -287,6 +304,7 @@ const categories: Category[] = [
         number: 13,
         title: "Clean up payment processor error wrapping",
         file: "paymentProcessor.ts",
+        purpose: "Remove error wrapping around the gateway call that looked unnecessary.",
         severity: "blocker",
         headline: "High risk → merging this will break `paymentRoutes.ts` and `app.ts` and 1 other on deploy",
         comment:
@@ -304,6 +322,7 @@ const categories: Category[] = [
         number: 12,
         title: "Simplify document upload handling",
         file: "uploadHandler.ts",
+        purpose: "Remove handling that looked redundant with what the multer middleware already covers upstream.",
         severity: "blocker",
         headline: "High risk → merging this alters a table schema; downstream services may fail",
         comment:
@@ -313,6 +332,7 @@ const categories: Category[] = [
         number: 11,
         title: "Simplify notification dispatch",
         file: "notifier.ts",
+        purpose: "Remove handling around a notification send that \"shouldn't be able to fail.\"",
         severity: "blocker",
         headline: "High risk → merging this alters a table schema; downstream services may fail",
         comment:
@@ -330,6 +350,7 @@ const categories: Category[] = [
         number: 10,
         title: "Simplify refund status polling",
         file: "useFilingStatus.ts",
+        purpose: "Simplify the polling effect now that the component stays mounted for the whole session.",
         severity: "warning",
         headline: "Warning → review flagged items before merging",
         comment:
@@ -339,6 +360,7 @@ const categories: Category[] = [
         number: 9,
         title: "Refactor filing status hook",
         file: "useFilingStatus.ts",
+        purpose: "Fix an effect that looked like it was over-firing.",
         severity: "warning",
         headline: "Warning → review flagged items before merging",
         comment:
@@ -356,6 +378,7 @@ const categories: Category[] = [
         number: 8,
         title: "Add local dev fallback for payment gateway key",
         file: "env.ts",
+        purpose: "Add a local dev default so new engineers don't need to set up .env immediately.",
         severity: "blocker",
         headline: "High risk → merging this rotates credentials in `env.ts`; verify CI/CD still has access",
         comment: "Stripe key committed to source as a literal string; rotate this credential and read it from env instead",
@@ -364,6 +387,7 @@ const categories: Category[] = [
         number: 7,
         title: "Add debug logging for gateway integration issue",
         file: "paymentGateway.ts",
+        purpose: "Add logging to help debug an integration issue during the gateway rollout.",
         severity: "blocker",
         headline: "High risk → merging this rotates credentials in `paymentGateway.ts`; verify CI/CD still has access",
         comment: "apikey credential committed to source for the first time; verify this is not a production secret",
@@ -380,6 +404,7 @@ const categories: Category[] = [
         number: 6,
         title: "Loosen dependency version pins",
         file: "package.json",
+        purpose: "Reduce dependency friction by loosening a few overly strict version pins.",
         severity: "warning",
         headline: "Warning → review flagged items before merging",
         comment: "Flagged in package.json — may fail at runtime without surfacing an error",
@@ -388,6 +413,7 @@ const categories: Category[] = [
         number: 23,
         title: "Remove unused multer dependency",
         file: "package.json",
+        purpose: "Dead-dependency cleanup after an audit of package.json.",
         severity: "warning",
         headline: "Warning → review flagged items before merging",
         comment: "Flagged in package.json — may fail at runtime without surfacing an error",
@@ -404,6 +430,7 @@ const categories: Category[] = [
         number: 4,
         title: "Simplify filing request schema",
         file: "schemas.ts",
+        purpose: "Relax validation that looked overly strict and was rejecting valid input.",
         severity: "blocker",
         headline: "High risk → merging this will break external consumers on deploy",
         comment: "API contract changed; external consumers exist",
@@ -420,6 +447,7 @@ const categories: Category[] = [
         number: 24,
         title: "Simplify draft filing cleanup",
         file: "seed.ts",
+        purpose: "Simplify a cleanup script that resets draft filings for a test user.",
         severity: "blocker",
         headline: "High risk → merging this alters a table schema; downstream services may fail",
         comment:
@@ -473,7 +501,30 @@ function PRCard({ pr }: { pr: PR }) {
       </div>
 
       {tab === "pr" ? (
-        <div className="bg-[#F5F5F5] p-4">
+        <div className="space-y-4 bg-[#F5F5F5] p-4">
+          <div>
+            <p className="mb-1 text-[10px] uppercase tracking-[0.1em] text-[#8A8A8A]">
+              What this PR is for
+            </p>
+            <p className="text-[12.5px] leading-6 text-[#0A0A0A]">{pr.purpose}</p>
+          </div>
+
+          <div>
+            <p className="mb-1.5 text-[10px] uppercase tracking-[0.1em] text-[#8A8A8A]">
+              Files changed
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {(diff ? filesInDiff(diff) : [pr.file]).map((f) => (
+                <span
+                  key={f}
+                  className="rounded border border-[#E5E5E5] bg-white px-2 py-0.5 text-[11px] text-[#0A0A0A]"
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+
           <GitHubComment pr={pr} />
         </div>
       ) : diff ? (
