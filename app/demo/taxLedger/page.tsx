@@ -21,48 +21,63 @@ function filesInDiff(diff: string): string[] {
 }
 
 // ── Diff rendering ─────────────────────────────────────────────────────────
-// Real diff text from GitHub, unified format. Strips the git/index/+++/--- header
-// lines (the file name is already shown in the card header above) and colors each
-// line by its leading +/-/@@ marker.
+// Real diff text from GitHub, unified format, one or more files per PR. Splits
+// on "diff --git" boundaries and renders a file-name header for each section —
+// a diff spanning multiple files (real ones do: PR2 touches 4) needs that
+// boundary shown, not silently dropped along with the noisy index/+++/--- lines.
+
+type DiffSection = { file: string; lines: string[] }
+
+function parseDiffSections(diff: string): DiffSection[] {
+  const rawLines = diff.split("\n")
+  const sections: DiffSection[] = []
+  let current: DiffSection | null = null
+
+  for (const line of rawLines) {
+    const header = line.match(/^diff --git a\/(.+?) b\/.+$/)
+    if (header) {
+      current = { file: header[1], lines: [] }
+      sections.push(current)
+      continue
+    }
+    if (!current) continue
+    if (line.startsWith("index ") || line.startsWith("+++") || line.startsWith("---")) continue
+    current.lines.push(line)
+  }
+
+  // Drop a single trailing blank line per section (artifact of the split above).
+  for (const s of sections) {
+    while (s.lines.length > 0 && s.lines[s.lines.length - 1] === "") s.lines.pop()
+  }
+  return sections
+}
+
+function DiffLine({ line }: { line: string }) {
+  if (line.startsWith("@@")) return <div className="text-[#6B9DC2]">{line}</div>
+  if (line.startsWith("+")) return <div className="bg-[#0F2818] text-[#5FD98A]">{line}</div>
+  if (line.startsWith("-")) return <div className="bg-[#2A1414] text-[#F27878]">{line}</div>
+  return <div className="text-[#8A8A8A]">{line}</div>
+}
 
 function DiffView({ diff }: { diff: string }) {
-  const lines = diff
-    .split("\n")
-    .filter((l) => !l.startsWith("diff --git") && !l.startsWith("index ") && !l.startsWith("+++") && !l.startsWith("---"))
-    .filter((l, i, arr) => !(l === "" && i === arr.length - 1))
+  const sections = parseDiffSections(diff)
 
   return (
-    <div className="overflow-x-auto bg-[#0A0A0A] px-4 py-3">
-      <pre className="text-[11.5px] leading-[1.7]">
-        {lines.map((line, i) => {
-          if (line.startsWith("@@")) {
-            return (
-              <div key={i} className="text-[#6B9DC2]">
-                {line}
-              </div>
-            )
-          }
-          if (line.startsWith("+")) {
-            return (
-              <div key={i} className="bg-[#0F2818] text-[#5FD98A]">
-                {line}
-              </div>
-            )
-          }
-          if (line.startsWith("-")) {
-            return (
-              <div key={i} className="bg-[#2A1414] text-[#F27878]">
-                {line}
-              </div>
-            )
-          }
-          return (
-            <div key={i} className="text-[#8A8A8A]">
-              {line}
+    <div className="divide-y divide-[#30363d] overflow-x-auto bg-[#0A0A0A]">
+      {sections.map((section, si) => (
+        <div key={si}>
+          {sections.length > 1 && (
+            <div className="border-b border-[#30363d] bg-[#161b22] px-4 py-2 text-[11px] font-medium text-[#8b949e]">
+              {section.file}
             </div>
-          )
-        })}
-      </pre>
+          )}
+          <pre className="px-4 py-3 text-[11.5px] leading-[1.7]">
+            {section.lines.map((line, i) => (
+              <DiffLine key={i} line={line} />
+            ))}
+          </pre>
+        </div>
+      ))}
     </div>
   )
 }
@@ -72,9 +87,42 @@ function DiffView({ diff }: { diff: string }) {
 // hides low-severity findings by default); blockers render open, since that's
 // the one thing worth seeing without an extra click.
 
-function GitHubComment({ pr }: { pr: PR }) {
-  const [open, setOpen] = useState(pr.severity === "blocker")
-  const dotColor = pr.severity === "blocker" ? "bg-[#f85149]" : "bg-[#d29922]"
+function FindingsTable({ findings }: { findings: Finding[] }) {
+  return (
+    <div className="overflow-hidden rounded border border-[#30363d]">
+      <table className="w-full border-collapse text-left text-[12px]">
+        <thead>
+          <tr className="border-b border-[#30363d] bg-[#161b22] text-[#8b949e]">
+            <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">File name</th>
+            <th className="px-3 py-2 font-medium">Why</th>
+          </tr>
+        </thead>
+        <tbody>
+          {findings.map((f, i) => (
+            <tr key={i} className={i > 0 ? "border-t border-[#21262d]" : ""}>
+              <td className="whitespace-nowrap px-3 py-2.5 align-top text-[#e6edf3]">
+                {f.severity === "blocker" ? "🔴 blocker" : "🟡 warning"}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2.5 align-top text-[#58a6ff]">{f.file}</td>
+              <td className="px-3 py-2.5 align-top leading-5 text-[#c9d1d9]">{f.reason}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function GitHubComment({ pr, fileCount }: { pr: PR; fileCount: number }) {
+  const blockers = pr.findings.filter((f) => f.severity === "blocker")
+  const warnings = pr.findings.filter((f) => f.severity === "warning")
+  const hasBlocker = blockers.length > 0
+  // Real behavior: blockers always render open, in a table with no toggle. Warnings
+  // render behind a collapsed disclosure — always, even alongside blockers, which is
+  // exactly the shape PR13/PR14 show (one open blocker row, one collapsed warning).
+  const [warningsOpen, setWarningsOpen] = useState(!hasBlocker)
+  const dotColor = hasBlocker ? "bg-[#f85149]" : "bg-[#d29922]"
   const headlineParts = pr.headline.split(/(`[^`]+`)/g)
 
   return (
@@ -107,41 +155,31 @@ function GitHubComment({ pr }: { pr: PR }) {
           </p>
         </div>
 
-        <button
-          onClick={() => setOpen(!open)}
-          className="mb-1 flex items-center gap-1.5 text-[12px] text-[#e6edf3]"
-        >
-          <span className={`inline-block transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
-          <span className={pr.severity === "blocker" ? "text-[#f85149]" : "text-[#d29922]"}>
-            {pr.severity === "blocker" ? "🔴" : "⚠️"}
-          </span>
-          <span>1 {pr.severity === "blocker" ? "blocker" : "warning"}</span>
-        </button>
-
-        {open && (
-          <div className="mt-2 overflow-hidden rounded border border-[#30363d]">
-            <table className="w-full border-collapse text-left text-[12px]">
-              <thead>
-                <tr className="border-b border-[#30363d] bg-[#161b22] text-[#8b949e]">
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 font-medium">File name</th>
-                  <th className="px-3 py-2 font-medium">Why</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="whitespace-nowrap px-3 py-2.5 align-top text-[#e6edf3]">
-                    {pr.severity === "blocker" ? "🔴 blocker" : "🟡 warning"}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 align-top text-[#58a6ff]">{pr.file}</td>
-                  <td className="px-3 py-2.5 align-top leading-5 text-[#c9d1d9]">{pr.comment}</td>
-                </tr>
-              </tbody>
-            </table>
+        {blockers.length > 0 && (
+          <div className={warnings.length > 0 ? "mb-3" : ""}>
+            <FindingsTable findings={blockers} />
           </div>
         )}
 
-        <p className="mt-3 text-[11.5px] italic text-[#8b949e]">1 finding · 1 file analyzed</p>
+        {warnings.length > 0 && (
+          <div>
+            <button
+              onClick={() => setWarningsOpen(!warningsOpen)}
+              className="mb-1 flex items-center gap-1.5 text-[12px] text-[#e6edf3]"
+            >
+              <span className={`inline-block transition-transform ${warningsOpen ? "rotate-90" : ""}`}>▶</span>
+              <span className="text-[#d29922]">⚠️</span>
+              <span>
+                {warnings.length} warning{warnings.length > 1 ? "s" : ""}
+              </span>
+            </button>
+            {warningsOpen && <FindingsTable findings={warnings} />}
+          </div>
+        )}
+
+        <p className="mt-3 text-[11.5px] italic text-[#8b949e]">
+          {pr.findings.length} finding{pr.findings.length > 1 ? "s" : ""} · {fileCount} file{fileCount > 1 ? "s" : ""} analyzed
+        </p>
       </div>
     </div>
   )
@@ -162,14 +200,14 @@ function BookCallButton({ className = "" }: { className?: string }) {
 
 // ── Data ───────────────────────────────────────────────────────────────────
 
+type Finding = { severity: "blocker" | "warning"; file: string; reason: string }
 type PR = {
   number: number
   title: string
   file: string
-  comment: string
-  severity: "blocker" | "warning"
   headline: string
   purpose: string
+  findings: Finding[]
 }
 type Category = { id: string; icon: string; name: string; description: string; prs: PR[] }
 
@@ -185,20 +223,28 @@ const categories: Category[] = [
         title: "Simplify tax calculation return shape",
         file: "taxCalculator.ts",
         purpose: "Collapse the return value down to just the final number now that most callers only need the total, not the full breakdown.",
-        severity: "warning",
         headline: "Warning → review flagged items before merging",
-        comment:
-          "Blast radius: 5 files (5 transitive), called by taxRoutes.ts, filingService.ts, app.ts, filingRoutes.ts, index.ts",
+        findings: [
+          {
+            severity: "warning",
+            file: "taxCalculator.ts",
+            reason: "Blast radius: 5 files (5 transitive), called by taxRoutes.ts, filingService.ts, app.ts, filingRoutes.ts, index.ts",
+          },
+        ],
       },
       {
         number: 2,
         title: "Extract shared rounding helper",
         file: "utils.ts",
         purpose: "DRY pass: tax and GST calculations were each rounding currency their own way — pull it into one shared helper.",
-        severity: "warning",
         headline: "Warning → review flagged items before merging",
-        comment:
-          "Blast radius: 13 files (13 transitive), called by app.ts, taxRoutes.ts, invoiceGenerator.ts, paymentProcessor.ts +9 more",
+        findings: [
+          {
+            severity: "warning",
+            file: "utils.ts",
+            reason: "Blast radius: 13 files (13 transitive), called by app.ts, taxRoutes.ts, invoiceGenerator.ts, paymentProcessor.ts, paymentRepository.ts, notifier.ts, filingRepository.ts, filingService.ts, index.ts, paymentRoutes.ts, adminRoutes.ts, uploadHandler.ts, filingRoutes.ts",
+          },
+        ],
       },
     ],
   },
@@ -213,20 +259,28 @@ const categories: Category[] = [
         title: "Share bracket lookup between tax and discount logic",
         file: "discountEngine.ts",
         purpose: "Reuse the existing bracket-lookup logic in the discount engine instead of duplicating it.",
-        severity: "warning",
         headline: "Warning → review flagged items before merging",
-        comment:
-          "Blast radius: 6 files (6 transitive), called by taxCalculator.ts, taxRoutes.ts, filingService.ts +3 more",
+        findings: [
+          {
+            severity: "warning",
+            file: "discountEngine.ts",
+            reason: "Blast radius: 6 files (6 transitive), called by taxCalculator.ts, taxRoutes.ts, filingService.ts, app.ts, filingRoutes.ts, index.ts",
+          },
+        ],
       },
       {
         number: 21,
         title: "Reuse calculation context across tax modules",
         file: "calculationContext.ts",
         purpose: "Share the calculation context helper across tax modules instead of each one rebuilding it.",
-        severity: "warning",
         headline: "Warning → review flagged items before merging",
-        comment:
-          "Blast radius: 7 files (7 transitive), called by discountEngine.ts, taxCalculator.ts, taxRoutes.ts +4 more",
+        findings: [
+          {
+            severity: "warning",
+            file: "calculationContext.ts",
+            reason: "Blast radius: 7 files (7 transitive), called by discountEngine.ts, taxCalculator.ts, taxRoutes.ts, filingService.ts, app.ts, filingRoutes.ts, index.ts",
+          },
+        ],
       },
     ],
   },
@@ -241,20 +295,28 @@ const categories: Category[] = [
         title: "Streamline admin route middleware chain",
         file: "adminRoutes.ts",
         purpose: "Simplify and deduplicate the middleware chain on the admin routes.",
-        severity: "blocker",
         headline: "High risk → merging this changes access control in `adminRoutes.ts`; verify users still have correct permissions",
-        comment:
-          "requireRole removed from route handler; endpoint is now accessible without this authorization check",
+        findings: [
+          {
+            severity: "blocker",
+            file: "adminRoutes.ts",
+            reason: "requireRole removed from route handler; endpoint is now accessible without this authorization check",
+          },
+        ],
       },
       {
         number: 19,
         title: "Remove redundant auth check on filing submit",
         file: "paymentRoutes.ts",
         purpose: "Remove what looked like a duplicate auth check on this route.",
-        severity: "blocker",
         headline: "High risk → merging this changes access control in `paymentRoutes.ts`; verify users still have correct permissions",
-        comment:
-          "An authorization check (requireAuth) was removed. If this handler still accepts a resource identifier from the caller, requests may now bypass a permission check that used to gate them.",
+        findings: [
+          {
+            severity: "blocker",
+            file: "paymentRoutes.ts",
+            reason: "An authorization check (requireAuth) was removed. If this handler still accepts a resource identifier from the caller, requests may now bypass a permission check that used to gate them.",
+          },
+        ],
       },
     ],
   },
@@ -269,18 +331,19 @@ const categories: Category[] = [
         title: "Add currency support to tax calculation",
         file: "taxCalculator.ts",
         purpose: "Add a currency parameter to the tax calculator ahead of multi-currency support.",
-        severity: "blocker",
         headline: "High risk → merging this will break external consumers on deploy",
-        comment: "API contract changed; external consumers exist",
+        findings: [{ severity: "blocker", file: "taxCalculator.ts", reason: "API contract changed; external consumers exist" }],
       },
       {
         number: 15,
         title: "Reorder GST calculation parameters for consistency",
         file: "gstCalculator.ts",
         purpose: "Reorder the GST calculator's parameters to match the tax calculator's convention.",
-        severity: "blocker",
         headline: "High risk → merging this will break external consumers on deploy",
-        comment: "API contract changed; external consumers exist",
+        findings: [
+          { severity: "blocker", file: "gstCalculator.ts", reason: "API contract changed; external consumers exist" },
+          { severity: "blocker", file: "taxRoutes.ts", reason: "Blast radius: changed, called by app.ts, index.ts" },
+        ],
       },
     ],
   },
@@ -295,20 +358,40 @@ const categories: Category[] = [
         title: "Simplify payment gateway call",
         file: "paymentGateway.ts",
         purpose: "Simplify the gateway call since the SDK already handles retries.",
-        severity: "blocker",
         headline: "High risk → merging this will break `paymentProcessor.ts` and `paymentRoutes.ts` and 2 others on deploy",
-        comment:
-          "A try/catch block around an await was removed. The awaited call's failure used to be caught here — if it throws now, the error propagates uncaught instead of being handled the way this code previously handled it.",
+        findings: [
+          {
+            severity: "blocker",
+            file: "paymentGateway.ts",
+            reason:
+              "A try/catch block around an await was removed. The awaited call's failure used to be caught here — if it throws now, the error propagates uncaught instead of being handled the way this code previously handled it.",
+          },
+          {
+            severity: "warning",
+            file: "paymentGateway.ts",
+            reason: "Blast radius: 4 files (4 transitive), called by paymentProcessor.ts, paymentRoutes.ts, app.ts, index.ts",
+          },
+        ],
       },
       {
         number: 13,
         title: "Clean up payment processor error wrapping",
         file: "paymentProcessor.ts",
         purpose: "Remove error wrapping around the gateway call that looked unnecessary.",
-        severity: "blocker",
         headline: "High risk → merging this will break `paymentRoutes.ts` and `app.ts` and 1 other on deploy",
-        comment:
-          "Same finding, on paymentProcessor.ts — the try/catch around the gateway call was removed here too.",
+        findings: [
+          {
+            severity: "blocker",
+            file: "paymentProcessor.ts",
+            reason:
+              "A try/catch block around an await was removed. The awaited call's failure used to be caught here — if it throws now, the error propagates uncaught instead of being handled the way this code previously handled it.",
+          },
+          {
+            severity: "warning",
+            file: "paymentProcessor.ts",
+            reason: "Blast radius: 3 files (3 transitive), called by paymentRoutes.ts, app.ts, index.ts",
+          },
+        ],
       },
     ],
   },
@@ -323,20 +406,37 @@ const categories: Category[] = [
         title: "Simplify document upload handling",
         file: "uploadHandler.ts",
         purpose: "Remove handling that looked redundant with what the multer middleware already covers upstream.",
-        severity: "blocker",
         headline: "High risk → merging this alters a table schema; downstream services may fail",
-        comment:
-          "A try/catch block around an await was removed — an upload failure now propagates uncaught instead of being handled",
+        findings: [
+          { severity: "blocker", file: "uploadHandler.ts", reason: "schema changed; downstream services may fail after migration" },
+          {
+            severity: "blocker",
+            file: "uploadHandler.ts",
+            reason:
+              "A try/catch block around an await was removed. The awaited call's failure used to be caught here — if it throws now, the error propagates uncaught instead of being handled the way this code previously handled it.",
+          },
+        ],
       },
       {
         number: 11,
         title: "Simplify notification dispatch",
         file: "notifier.ts",
         purpose: "Remove handling around a notification send that \"shouldn't be able to fail.\"",
-        severity: "blocker",
         headline: "High risk → merging this alters a table schema; downstream services may fail",
-        comment:
-          "A try/catch block around an await was removed — a failed notification now propagates uncaught instead of being handled",
+        findings: [
+          { severity: "blocker", file: "notifier.ts", reason: "schema changed; downstream services may fail after migration" },
+          {
+            severity: "blocker",
+            file: "filingService.ts",
+            reason: "Blast radius: 3 files (3 transitive), called by filingRoutes.ts, app.ts, index.ts",
+          },
+          {
+            severity: "blocker",
+            file: "notifier.ts",
+            reason:
+              "A try/catch block around an await was removed. The awaited call's failure used to be caught here — if it throws now, the error propagates uncaught instead of being handled the way this code previously handled it.",
+          },
+        ],
       },
     ],
   },
@@ -351,20 +451,40 @@ const categories: Category[] = [
         title: "Simplify refund status polling",
         file: "useFilingStatus.ts",
         purpose: "Simplify the polling effect now that the component stays mounted for the whole session.",
-        severity: "warning",
         headline: "Warning → review flagged items before merging",
-        comment:
-          "A bare return () => {...} was removed. If this was a useEffect cleanup, whatever it was tearing down — an event listener, a subscription, a timer — now leaks: it keeps running after the component unmounts, and can fire against stale state.",
+        findings: [
+          {
+            severity: "warning",
+            file: "useFilingStatus.ts",
+            reason: "Blast radius: 3 files (3 transitive), called by RefundStatusTicker.tsx, App.tsx, main.tsx",
+          },
+          {
+            severity: "warning",
+            file: "useFilingStatus.ts",
+            reason:
+              "A bare return () => {...} was removed. If this was a useEffect cleanup, whatever it was tearing down, an event listener, a subscription, a timer, now leaks: it keeps running after the component unmounts or the effect re-runs, and can fire against stale state.",
+          },
+        ],
       },
       {
         number: 9,
         title: "Refactor filing status hook",
         file: "useFilingStatus.ts",
         purpose: "Fix an effect that looked like it was over-firing.",
-        severity: "warning",
         headline: "Warning → review flagged items before merging",
-        comment:
-          "A hook's dependency array shrank (1 → 0 entries). If the removed dependency is still referenced inside the hook, it now closes over a stale value instead of reacting to changes — a common source of bugs that only show up intermittently.",
+        findings: [
+          {
+            severity: "warning",
+            file: "useFilingStatus.ts",
+            reason: "Blast radius: 3 files (3 transitive), called by RefundStatusTicker.tsx, App.tsx, main.tsx",
+          },
+          {
+            severity: "warning",
+            file: "useFilingStatus.ts",
+            reason:
+              "A hook's dependency array shrank (1 → 0 entries). If the removed dependency is still referenced inside the hook, it now closes over a stale value instead of reacting to changes — a common source of bugs that only show up intermittently.",
+          },
+        ],
       },
     ],
   },
@@ -379,18 +499,28 @@ const categories: Category[] = [
         title: "Add local dev fallback for payment gateway key",
         file: "env.ts",
         purpose: "Add a local dev default so new engineers don't need to set up .env immediately.",
-        severity: "blocker",
         headline: "High risk → merging this rotates credentials in `env.ts`; verify CI/CD still has access",
-        comment: "Stripe key committed to source as a literal string; rotate this credential and read it from env instead",
+        findings: [
+          {
+            severity: "blocker",
+            file: "env.ts",
+            reason: "Stripe key committed to source as a literal string; rotate this credential and read it from env instead",
+          },
+        ],
       },
       {
         number: 7,
         title: "Add debug logging for gateway integration issue",
         file: "paymentGateway.ts",
         purpose: "Add logging to help debug an integration issue during the gateway rollout.",
-        severity: "blocker",
         headline: "High risk → merging this rotates credentials in `paymentGateway.ts`; verify CI/CD still has access",
-        comment: "apikey credential committed to source for the first time; verify this is not a production secret",
+        findings: [
+          {
+            severity: "blocker",
+            file: "paymentGateway.ts",
+            reason: "apikey credential committed to source for the first time; verify this is not a production secret",
+          },
+        ],
       },
     ],
   },
@@ -405,18 +535,16 @@ const categories: Category[] = [
         title: "Loosen dependency version pins",
         file: "package.json",
         purpose: "Reduce dependency friction by loosening a few overly strict version pins.",
-        severity: "warning",
         headline: "Warning → review flagged items before merging",
-        comment: "Flagged in package.json — may fail at runtime without surfacing an error",
+        findings: [{ severity: "warning", file: "package.json", reason: "may fail at runtime without surfacing an error" }],
       },
       {
         number: 23,
         title: "Remove unused multer dependency",
         file: "package.json",
         purpose: "Dead-dependency cleanup after an audit of package.json.",
-        severity: "warning",
         headline: "Warning → review flagged items before merging",
-        comment: "Flagged in package.json — may fail at runtime without surfacing an error",
+        findings: [{ severity: "warning", file: "package.json", reason: "may fail at runtime without surfacing an error" }],
       },
     ],
   },
@@ -431,9 +559,8 @@ const categories: Category[] = [
         title: "Simplify filing request schema",
         file: "schemas.ts",
         purpose: "Relax validation that looked overly strict and was rejecting valid input.",
-        severity: "blocker",
         headline: "High risk → merging this will break external consumers on deploy",
-        comment: "API contract changed; external consumers exist",
+        findings: [{ severity: "blocker", file: "schemas.ts", reason: "API contract changed; external consumers exist" }],
       },
     ],
   },
@@ -448,10 +575,16 @@ const categories: Category[] = [
         title: "Simplify draft filing cleanup",
         file: "seed.ts",
         purpose: "Simplify a cleanup script that resets draft filings for a test user.",
-        severity: "blocker",
         headline: "High risk → merging this alters a table schema; downstream services may fail",
-        comment:
-          "deleteMany() called with no filter — this deletes every row in the table, not a scoped subset. If a where clause was meant to be here, its absence won't throw; it'll just wipe the table.",
+        findings: [
+          { severity: "blocker", file: "seed.ts", reason: "schema changed; downstream services may fail after migration" },
+          {
+            severity: "blocker",
+            file: "seed.ts",
+            reason:
+              "deleteMany() called with no filter — this deletes every row in the table, not a scoped subset. If a where clause was meant to be here, its absence won't throw; it'll just wipe the table.",
+          },
+        ],
       },
     ],
   },
@@ -472,6 +605,9 @@ function PRCard({ pr }: { pr: PR }) {
         : "border-transparent text-[#8A8A8A] hover:text-black"
     }`
 
+  const changedFiles = diff ? filesInDiff(diff) : [pr.file]
+  const fileBadge = changedFiles.length > 1 ? `${changedFiles.length} files` : pr.file
+
   return (
     <div className="overflow-hidden rounded border border-[#E5E5E5]">
       <div className="flex items-center gap-3 border-b border-[#E5E5E5] bg-[#F5F5F5] px-4 py-3">
@@ -487,7 +623,7 @@ function PRCard({ pr }: { pr: PR }) {
           #{pr.number} — {pr.title}
         </a>
         <span className="ml-auto shrink-0 rounded border border-[#E5E5E5] bg-white px-2 py-0.5 text-[10px] tracking-[0.02em] text-[#6B6B6B]">
-          {pr.file}
+          {fileBadge}
         </span>
       </div>
 
@@ -514,7 +650,7 @@ function PRCard({ pr }: { pr: PR }) {
               Files changed
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {(diff ? filesInDiff(diff) : [pr.file]).map((f) => (
+              {changedFiles.map((f) => (
                 <span
                   key={f}
                   className="rounded border border-[#E5E5E5] bg-white px-2 py-0.5 text-[11px] text-[#0A0A0A]"
@@ -525,7 +661,7 @@ function PRCard({ pr }: { pr: PR }) {
             </div>
           </div>
 
-          <GitHubComment pr={pr} />
+          <GitHubComment pr={pr} fileCount={changedFiles.length} />
         </div>
       ) : diff ? (
         <DiffView diff={diff} />
